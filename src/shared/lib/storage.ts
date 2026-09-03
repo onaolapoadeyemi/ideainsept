@@ -1,0 +1,14 @@
+export function readJson<T>(key: string, fallback: T): T {
+  if (typeof localStorage === "undefined") return fallback;
+  const value = localStorage.getItem(key);
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+export function writeJson<T>(key: string, value: T) {
+  localStorage.setItem(key, JSON.stringify(value));
+}
