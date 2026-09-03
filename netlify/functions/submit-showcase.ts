@@ -5,6 +5,7 @@ import { publicUrlSchema } from "../../src/shared/lib/urls";
 
 const schema = z.object({
   sprintId: z.string().uuid(),
+  seasonId: z.string().uuid(),
   projectName: z.string().min(2).max(90),
   tagline: z.string().min(4).max(150),
   pitch: z.string().min(20).max(1600),
@@ -23,12 +24,15 @@ export const handler: Handler = async (event) => {
     const user = await requireUser(event.headers.authorization);
     const body = await parseJson(event.body, schema, 5000);
     const supabase = supabaseAdmin();
+    const { data: sprint, error: sprintError } = await supabase.from("sprints").select("id, season_id").eq("id", body.sprintId).eq("owner_id", user.id).eq("season_id", body.seasonId).maybeSingle();
+    if (sprintError) throw sprintError;
+    if (!sprint) throw new Error("The selected sprint does not belong to this user and season.");
     const { data, error } = await supabase
       .from("showcase_submissions")
       .insert({
         owner_id: user.id,
         sprint_id: body.sprintId,
-        season_id: null,
+        season_id: body.seasonId,
         project_name: body.projectName,
         tagline: body.tagline,
         pitch: body.pitch,

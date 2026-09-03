@@ -1,13 +1,26 @@
 import { Check, Zap } from "lucide-react";
-import { sprintPassEntitlement } from "./entitlements";
 import { analytics } from "../../shared/services/analytics";
 import { useToast } from "../../shared/components/Toast";
+import { apiFetch } from "../../shared/services/api";
+import { clientConfig } from "../../app/config";
+import { useAuth } from "../auth/AuthProvider";
+import { useEntitlement } from "./EntitlementProvider";
 
 export default function PricingPage() {
   const { notify } = useToast();
+  const { user } = useAuth();
+  const { entitlement } = useEntitlement();
   async function startCheckout() {
     analytics.track("checkout_started", { plan: "sprint_pass" });
-    const response = await fetch("/api/create-checkout-session", { method: "POST" });
+    if (!clientConfig.paymentsEnabled) {
+      notify("Payments are intentionally disabled until Stripe is connected in the next phase.", "info");
+      return;
+    }
+    if (!user) {
+      notify("Sign in before purchasing so the pass can be linked to your account.", "warning");
+      return;
+    }
+    const response = await apiFetch("/api/create-checkout-session", { method: "POST" });
     if (!response.ok) {
       notify("Stripe is not configured yet. Add test credentials to enable checkout.", "warning");
       return;
@@ -20,7 +33,7 @@ export default function PricingPage() {
     <section className="grid gap-5 lg:grid-cols-2">
       <article className="panel p-6">
         <h1 className="text-3xl font-black">Free Explorer</h1>
-        <p className="mt-3 text-muted">One no-signup idea, five saved seasonal generations after signup, one active sprint, and one public showcase submission.</p>
+        <p className="mt-3 text-muted">One no-signup idea, a tightly limited live-AI allowance with unlimited curated fallbacks, one active sprint, and one public showcase submission.</p>
         <ul className="mt-6 grid gap-3 text-sm">
           {["AI idea generator", "30-day sprint tracker", "Community voting", "One public showcase submission"].map((item) => (
             <li key={item} className="flex gap-2">
@@ -35,10 +48,9 @@ export default function PricingPage() {
         <p className="mt-3 text-muted">A one-time annual season pass. No automatic renewal is enabled in this MVP.</p>
         <ul className="mt-6 grid gap-3 text-sm">
           {[
-            `${sprintPassEntitlement.aiGenerationsPerSeason} AI generations per season`,
+            "Expanded AI allowance within the platform-wide cost ceiling",
             "Idea refinement and pivot suggestions",
             "AI-generated 30-day execution plan",
-            "Up to 3 active sprint experiments",
             "Private notes, exportable report, and unlisted sprint option",
             "Priority showcase review, described as faster review only",
           ].map((item) => (
@@ -48,9 +60,9 @@ export default function PricingPage() {
             </li>
           ))}
         </ul>
-        <button className="button button-primary mt-6" onClick={startCheckout}>
+        <button className="button button-primary mt-6" onClick={startCheckout} disabled={!clientConfig.paymentsEnabled || entitlement.plan === "sprint_pass"}>
           <Zap size={18} aria-hidden="true" />
-          Upgrade Now
+          {entitlement.plan === "sprint_pass" ? "Sprint Pass Active" : clientConfig.paymentsEnabled ? "Upgrade Now" : "Payments Coming Next"}
         </button>
       </article>
     </section>

@@ -8,7 +8,7 @@ Cross-module communication uses typed public functions such as `createSprintFrom
 
 ## Storage Choices
 
-Supabase Postgres is the production source of truth for authenticated data: profiles, ideas, sprints, logs, submissions, votes, purchases, entitlements, AI usage, and consent records. Browser localStorage is limited to demo-mode data, anonymous guest drafts, UI recovery, and offline-safe daily-log drafts.
+Supabase Postgres is the production source of truth for authenticated data: profiles, ideas, sprints, logs, milestones, submissions, votes, purchases, entitlements, seasons, feature flags, AI usage, and consent records. Browser localStorage is limited to the explicit credential-free demo adapter and anonymous guest drafts. Configured deployments do not use localStorage as an authenticated source of truth.
 
 File uploads are disabled by default. The MVP uses validated external project, repository, video, and thumbnail URLs to avoid unnecessary storage cost before revenue.
 
@@ -18,8 +18,8 @@ The first monetized product is a $29 one-time Sprint Pass for an annual season. 
 
 ## Failure Isolation
 
-The React app uses a global boundary and independently lazy-loaded feature routes. Gemini, Stripe, and Supabase are wrapped behind adapters or Netlify Functions that return typed errors. Gemini failure falls back to curated ideas. Billing failure preserves existing access and shows a status message. Showcase failures do not block sprint tracking.
+The shared navigation shell remains mounted while each independently lazy-loaded feature route has its own error boundary and database-driven feature flag. Gemini, Stripe, and privileged Supabase operations are wrapped behind Netlify Functions that return typed errors. Gemini failure falls back to curated ideas. Billing failure preserves existing access and shows a status message. Showcase failures do not block sprint tracking.
 
 ## Cost Safety
 
-`COST_MODE=free` and `ALLOW_PAID_INFRA=false` are server-side controls. Live AI can be disabled with `LIVE_AI_ENABLED=false`, and file uploads default off. The app remains useful in curated/demo mode when paid-capable services are absent.
+`COST_MODE=free` and `ALLOW_PAID_INFRA=false` reject contradictory paid-infrastructure configuration. Live AI and payments default off independently. When live AI is enabled, a database transaction claims an actor and global quota slot before the upstream call, and the live cutoff defaults to 80% of the configured global ceiling. The app remains useful in curated mode when paid-capable services are absent.

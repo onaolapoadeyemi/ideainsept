@@ -17,11 +17,14 @@ export const handler: Handler = async (event) => {
     const { data: existing } = await supabase.from("webhook_events").select("id").eq("id", eventId).maybeSingle();
     if (existing) return json({ received: true, idempotent: true }, 200, requestId);
 
-    if (stripeEvent.type === "checkout.session.completed") {
+    if (stripeEvent.type === "checkout.session.completed" || stripeEvent.type === "checkout.session.async_payment_succeeded") {
       const session = stripeEvent.data.object as Stripe.Checkout.Session;
       const userId = session.client_reference_id || session.metadata?.user_id;
-      if (userId) {
-        await supabase.from("purchases").upsert({
+      if (!userId || session.metadata?.product !== "sprint_pass") throw new AppError("validation", "Checkout metadata is incomplete.", 400);
+      if (session.payment_status === "paid" || stripeEvent.type === "checkout.session.async_payment_succeeded") {
+        const { data: profile } = await supabase.from("profiles").select("id").eq("id", userId).maybeSingle();
+        if (!profile) throw new AppError("validation", "Checkout user does not exist.", 400);
+        const { error: purchaseError } = await supabase.from("purchases").upsert({
           user_id: userId,
           stripe_customer_id: String(session.customer || ""),
           stripe_checkout_session_id: session.id,
@@ -29,16 +32,19 @@ export const handler: Handler = async (event) => {
           product_price_reference: session.metadata?.price_id || env.STRIPE_SPRINT_PASS_PRICE_ID,
           status: "paid",
           last_verified_webhook_at: new Date().toISOString(),
-        });
-        await supabase.from("entitlements").upsert({
+        }, { onConflict: "stripe_checkout_session_id" });
+        if (purchaseError) throw purchaseError;
+        const seasonYear = Number(session.metadata?.season_year);
+        const { error: entitlementError } = await supabase.from("entitlements").upsert({
           user_id: userId,
           source: "stripe_checkout",
           status: "active",
-          season_year: Number(session.metadata?.season_year || 2026),
+          season_year: seasonYear,
           starts_at: new Date().toISOString(),
-          ends_at: "2026-12-31T23:59:59.000Z",
+          ends_at: `${seasonYear}-12-31T23:59:59.000Z`,
           stripe_checkout_session_id: session.id,
-        });
+        }, { onConflict: "stripe_checkout_session_id" });
+        if (entitlementError) throw entitlementError;
       }
     }
 

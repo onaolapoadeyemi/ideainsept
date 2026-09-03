@@ -1,8 +1,12 @@
 import { Lock, Zap } from "lucide-react";
 import { analytics } from "../../shared/services/analytics";
+import { useEffect } from "react";
+import { useEntitlement } from "./EntitlementProvider";
 
 export function Paywall({ feature, benefit }: { feature: string; benefit: string }) {
-  analytics.track("paywall_viewed", { feature });
+  const { entitlement } = useEntitlement();
+  useEffect(() => analytics.track("paywall_viewed", { feature }), [feature]);
+  if (entitlement.plan === "sprint_pass") return null;
   return (
     <aside className="panel border-amber-400/35 p-5">
       <div className="flex items-start gap-3">

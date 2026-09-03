@@ -3,16 +3,24 @@ import { Link } from "react-router-dom";
 import { CalendarDays, Download, Save } from "lucide-react";
 import { Paywall } from "../billing/Paywall";
 import { calculateProgress, supportiveRecoveryCopy } from "./calculations";
-import { getActiveSprint, updateSprintDay } from "./sprintRepository";
+import { getActiveSprint, updateMilestone, updateSprintDay } from "./sprintRepository";
 import { Sprint, SprintDayStatus } from "./types";
 import { analytics } from "../../shared/services/analytics";
 import { useToast } from "../../shared/components/Toast";
+import { useAuth } from "../auth/AuthProvider";
+import { useSeason } from "../season/SeasonProvider";
+import { LoadingPanel } from "../../shared/components/LoadingPanel";
+import { useEntitlement } from "../billing/EntitlementProvider";
 
 export default function SprintTrackerPage() {
-  const [sprint, setSprint] = useState<Sprint | null>(() => getActiveSprint());
+  const [sprint, setSprint] = useState<Sprint | null>(null);
+  const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState(1);
   const [saveState, setSaveState] = useState("Saved");
   const { notify } = useToast();
+  const { user, loading: authLoading } = useAuth();
+  const { season, loading: seasonLoading } = useSeason();
+  const { entitlement } = useEntitlement();
   const selected = sprint?.days.find((day) => day.dayNumber === selectedDay);
   const progress = useMemo(() => (sprint ? calculateProgress(sprint) : null), [sprint]);
 
@@ -21,6 +29,18 @@ export default function SprintTrackerPage() {
     const id = window.setTimeout(() => setSaveState("Saved"), 500);
     return () => window.clearTimeout(id);
   }, [selected]);
+
+  useEffect(() => {
+    if (authLoading || seasonLoading) return;
+    let active = true;
+    getActiveSprint(user?.id, season.id)
+      .then((value) => { if (active) setSprint(value); })
+      .catch((error) => notify(error instanceof Error ? error.message : "Sprint could not be loaded.", "error"))
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [authLoading, notify, season.id, seasonLoading, user?.id]);
+
+  if (loading) return <LoadingPanel label="Loading your sprint" />;
 
   if (!sprint) {
     return (
@@ -35,10 +55,14 @@ export default function SprintTrackerPage() {
   }
 
   function patchDay(patch: { status?: SprintDayStatus; summary?: string; blocker?: string; nextAction?: string; minutesWorked?: number }) {
-    const updated = updateSprintDay(selectedDay, patch);
-    if (!updated) return;
+    if (!sprint) return;
+    const updated = { ...sprint, days: sprint.days.map((day) => day.dayNumber === selectedDay ? { ...day, ...patch, updatedAt: new Date().toISOString() } : day) };
     setSaveState("Saving");
     setSprint(updated);
+    void updateSprintDay(sprint.id, selectedDay, patch).catch((error) => {
+      notify(error instanceof Error ? error.message : "Day could not be saved.", "error");
+      setSaveState("Save failed");
+    });
     if (patch.status === "completed") analytics.track("sprint_day_completed", { day: selectedDay });
   }
 
@@ -62,7 +86,7 @@ export default function SprintTrackerPage() {
         )}
         <div className="mt-6 flex items-center gap-2">
           <CalendarDays className="text-amber-300" aria-hidden="true" />
-          <h2 className="text-xl font-black">September 1-30</h2>
+          <h2 className="text-xl font-black">September 1-30, {season.year}</h2>
         </div>
         <div className="mt-4 grid grid-cols-5 gap-2 sm:grid-cols-10" role="grid" aria-label="Sprint day status calendar">
           {sprint.days.map((day) => (
@@ -93,7 +117,7 @@ export default function SprintTrackerPage() {
         {selected && (
           <form className="panel p-5">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-black">Day {selected.dayNumber} Dev Log</h2>
+              <h2 className="text-xl font-black">Day {selected.dayNumber} Build Log</h2>
               <span className="text-sm text-muted" aria-live="polite">
                 {saveState}
               </span>
@@ -148,13 +172,35 @@ export default function SprintTrackerPage() {
                   <span className="block font-bold">{milestone.title}</span>
                   <span className="text-xs text-muted">{milestone.targetDate}</span>
                 </span>
-                <input type="checkbox" defaultChecked={Boolean(milestone.completedAt)} aria-label={`Complete ${milestone.title}`} />
+                <input
+                  type="checkbox"
+                  checked={Boolean(milestone.completedAt)}
+                  aria-label={`Complete ${milestone.title}`}
+                  onChange={(event) => {
+                    const completed = event.target.checked;
+                    setSprint((current) => current ? { ...current, milestones: current.milestones.map((item) => item.id === milestone.id ? { ...item, completedAt: completed ? new Date().toISOString() : undefined } : item) } : current);
+                    void updateMilestone(sprint.id, milestone.id, completed).catch((error) => notify(error instanceof Error ? error.message : "Milestone could not be saved.", "error"));
+                  }}
+                />
               </label>
             ))}
           </div>
         </div>
         <Paywall feature="Export sprint report" benefit="Sprint Pass creates a clean report with milestones, streaks, and private notes for your portfolio or sponsor update." />
-        <button className="button button-ghost" onClick={() => notify("Export requires Sprint Pass. Your sprint data stays intact.", "warning")}>
+        <button className="button button-ghost" onClick={() => {
+          if (entitlement.plan !== "sprint_pass") {
+            notify("Export requires Sprint Pass. Your sprint data stays intact.", "warning");
+            return;
+          }
+          const blob = new Blob([JSON.stringify(sprint, null, 2)], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `ideainsept-${season.year}-${sprint.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.json`;
+          link.click();
+          URL.revokeObjectURL(url);
+          notify("Sprint report exported.");
+        }}>
           <Download size={18} aria-hidden="true" />
           Export Report
         </button>

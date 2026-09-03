@@ -2,8 +2,9 @@ import { Component, ErrorInfo, PropsWithChildren, ReactNode } from "react";
 import { isRouteErrorResponse, Link, useRouteError } from "react-router-dom";
 
 type State = { error: Error | null };
+type BoundaryProps = PropsWithChildren<{ name?: string; resetKey?: string }>;
 
-export class AppErrorBoundary extends Component<PropsWithChildren, State> {
+export class AppErrorBoundary extends Component<BoundaryProps, State> {
   state: State = { error: null };
 
   static getDerivedStateFromError(error: Error): State {
@@ -14,9 +15,13 @@ export class AppErrorBoundary extends Component<PropsWithChildren, State> {
     console.error("Route boundary caught error", { error: error.message, componentStack: info.componentStack });
   }
 
+  componentDidUpdate(previous: BoundaryProps) {
+    if (this.state.error && previous.resetKey !== this.props.resetKey) this.setState({ error: null });
+  }
+
   render(): ReactNode {
     if (this.state.error) {
-      return <FeatureFallback title="This part stalled" message={this.state.error.message} />;
+      return <FeatureFallback title={`${this.props.name || "This feature"} stalled`} message={this.state.error.message} />;
     }
     return this.props.children;
   }

@@ -8,7 +8,7 @@ describe("entitlements", () => {
   });
 
   it("checks generation allowances", () => {
-    expect(isGenerationAllowed(freeEntitlement, 4)).toBe(true);
-    expect(isGenerationAllowed(freeEntitlement, 5)).toBe(false);
+    expect(isGenerationAllowed(freeEntitlement, 2)).toBe(true);
+    expect(isGenerationAllowed(freeEntitlement, 3)).toBe(false);
   });
 });

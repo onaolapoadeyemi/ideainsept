@@ -9,11 +9,12 @@ import { generateIdeas, saveIdea } from "./ideaRepository";
 import { createSprintFromIdea } from "../sprint-tracker/sprintRepository";
 import { analytics } from "../../shared/services/analytics";
 import { useToast } from "../../shared/components/Toast";
+import { useSeason } from "../season/SeasonProvider";
 
 const initialRequest: IdeaRequest = {
-  skills: "TypeScript, React, product design",
-  interests: "developer tools, creator businesses",
-  audience: "independent developers and solo founders",
+  skills: "web design, marketing, React",
+  interests: "digital products, creator businesses",
+  audience: "independent creators and solo founders",
   hoursPerWeek: 8,
   buildType: "saas",
   experienceLevel: "intermediate",
@@ -27,6 +28,7 @@ export default function IdeaGeneratorPage({ embedded = false }: { embedded?: boo
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
+  const { season } = useSeason();
   const { notify } = useToast();
   const navigate = useNavigate();
   const selectedIdea = ideas.find((idea) => idea.id === selectedId) ?? ideas[0];
@@ -40,20 +42,24 @@ export default function IdeaGeneratorPage({ embedded = false }: { embedded?: boo
     setLoading(false);
   }
 
-  function commit() {
+  async function commit() {
     if (!selectedIdea) return;
     analytics.track("sprint_commit_started", { source: selectedIdea.source });
     if (!user) {
-      saveIdea(selectedIdea);
+      await saveIdea(selectedIdea);
       notify("Sign in to commit. Your generated idea has been preserved locally.", "warning");
       navigate("/account");
       return;
     }
-    saveIdea(selectedIdea);
-    createSprintFromIdea(selectedIdea, user.id);
-    analytics.track("sprint_committed", { source: selectedIdea.source });
-    notify("Sprint committed. Day one is ready.");
-    navigate("/sprint");
+    try {
+      const ideaId = await saveIdea(selectedIdea, user.id, season.id);
+      await createSprintFromIdea(selectedIdea, user.id, season, ideaId);
+      analytics.track("sprint_committed", { source: selectedIdea.source });
+      notify("Sprint committed. Day one is ready.");
+      navigate("/sprint");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "The sprint could not be committed.", "error");
+    }
   }
 
   return (
@@ -151,16 +157,15 @@ export default function IdeaGeneratorPage({ embedded = false }: { embedded?: boo
               ))}
             </div>
             <div className="mt-5 flex flex-wrap gap-3">
-              <button className="button button-primary" onClick={commit}>
+              <button className="button button-primary" onClick={() => void commit()}>
                 <Rocket size={18} aria-hidden="true" />
                 Commit to this Sprint
               </button>
               <button
                 className="button button-secondary"
-                onClick={() => {
-                  saveIdea(selectedIdea);
-                  notify("Idea saved.");
-                }}
+                onClick={() => void saveIdea(selectedIdea, user?.id, season.id)
+                  .then(() => notify("Idea saved."))
+                  .catch((error) => notify(error instanceof Error ? error.message : "Idea could not be saved.", "error"))}
               >
                 <Save size={18} aria-hidden="true" />
                 Save Idea
@@ -188,7 +193,7 @@ export default function IdeaGeneratorPage({ embedded = false }: { embedded?: boo
           </div>
         )}
         <Paywall feature="Refine and plan with AI" benefit="Sprint Pass unlocks refinement, pivot suggestions, and an AI-generated 30-day execution plan before the $29 price appears." />
-        <p className="text-xs text-muted">Free seasonal allowance: {freeEntitlement.aiGenerationsPerSeason} saved generations after signup. Guest hook: one no-signup idea.</p>
+        <p className="text-xs text-muted">Free live-AI allowance: {freeEntitlement.aiGenerationsPerSeason} requests within the configured quota window. Curated generation remains available when the live limit is reached.</p>
         {!embedded && (
           <Link to="/showcase" className="button button-secondary justify-self-start">
             Explore the Showcase

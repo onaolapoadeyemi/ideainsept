@@ -14,9 +14,12 @@ export const serverConfigSchema = z.object({
   ADMIN_EMAILS: z.string().default(""),
   COST_MODE: z.enum(["free", "revenue"]).default("free"),
   ALLOW_PAID_INFRA: z.enum(["true", "false"]).default("false"),
-  LIVE_AI_ENABLED: z.enum(["true", "false"]).default("true"),
+  PAYMENTS_ENABLED: z.enum(["true", "false"]).default("false"),
+  LIVE_AI_ENABLED: z.enum(["true", "false"]).default("false"),
   AI_FREE_USER_MONTHLY_LIMIT: z.coerce.number().int().min(0).default(3),
   AI_GLOBAL_MONTHLY_LIMIT: z.coerce.number().int().min(0).default(500),
+  AI_LIVE_CUTOFF_PERCENT: z.coerce.number().int().min(1).max(100).default(80),
+  AI_QUOTA_PEPPER: z.string().min(16).optional(),
 });
 
 export function config() {
@@ -70,6 +73,25 @@ export async function requireUser(authorizationHeader?: string) {
   const { data, error } = await client.auth.getUser(token);
   if (error || !data.user) throw new AppError("authentication", "Session is invalid or expired.", 401);
   return data.user;
+}
+
+export async function optionalUser(authorizationHeader?: string) {
+  if (!authorizationHeader?.startsWith("Bearer ")) return null;
+  return requireUser(authorizationHeader);
+}
+
+export async function requireModerator(authorizationHeader?: string) {
+  const user = await requireUser(authorizationHeader);
+  const { data, error } = await supabaseAdmin().from("profiles").select("role").eq("id", user.id).single();
+  if (error || !data || !["moderator", "admin"].includes(data.role)) throw new AppError("authorization", "Moderator access is required.", 403);
+  return user;
+}
+
+export async function getActiveSeason() {
+  const { data, error } = await supabaseAdmin().from("seasons").select("*").in("status", ["open", "submission", "voting", "judging", "upcoming"]).order("year", { ascending: true }).limit(1).maybeSingle();
+  if (error) throw error;
+  if (!data) throw new AppError("configuration", "No active IdeaInSept season is configured.", 503);
+  return data;
 }
 
 export function isAdminEmail(email: string | undefined) {

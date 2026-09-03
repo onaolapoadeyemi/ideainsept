@@ -15,7 +15,7 @@ export type Entitlement = {
 export const freeEntitlement: Entitlement = {
   plan: "free",
   seasonYear: 2026,
-  aiGenerationsPerSeason: 5,
+  aiGenerationsPerSeason: 3,
   activeSprintLimit: 1,
   canRefineIdeas: false,
   canGenerateSprintPlan: false,

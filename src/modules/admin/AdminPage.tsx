@@ -1,14 +1,36 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { useAuth } from "../auth/AuthProvider";
 import { getSubmissions, moderateSubmission } from "../showcase/showcaseRepository";
 import { ShowcaseSubmission } from "../showcase/types";
 import { useToast } from "../../shared/components/Toast";
+import { apiFetch } from "../../shared/services/api";
+import { hasSupabaseClientConfig } from "../../app/config";
 
 export default function AdminPage() {
   const { user } = useAuth();
   const { notify } = useToast();
-  const [submissions, setSubmissions] = useState<ShowcaseSubmission[]>(() => getSubmissions());
+  const [submissions, setSubmissions] = useState<ShowcaseSubmission[]>([]);
+  const [metrics, setMetrics] = useState({ aiCallsThisMonth: 0, pendingSubmissions: 0, liveAI: false, billing: false });
+
+  useEffect(() => {
+    if (user?.role !== "admin" && user?.role !== "moderator") return;
+    if (!hasSupabaseClientConfig) {
+      getSubmissions(true).then(setSubmissions).catch((error) => notify(error instanceof Error ? error.message : "Moderation queue could not be loaded.", "error"));
+      return;
+    }
+    Promise.all([
+      getSubmissions(true),
+      apiFetch("/api/admin-metrics").then(async (response) => {
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error?.message || "Metrics unavailable.");
+        return body.metrics;
+      }),
+    ]).then(([items, nextMetrics]) => {
+      setSubmissions(items);
+      setMetrics({ aiCallsThisMonth: nextMetrics.aiCallsThisMonth, pendingSubmissions: nextMetrics.pendingSubmissions, liveAI: Boolean(nextMetrics.flags?.liveAI), billing: Boolean(nextMetrics.flags?.billing) });
+    }).catch((error) => notify(error instanceof Error ? error.message : "Administration data could not be loaded.", "error"));
+  }, [notify, user?.role]);
 
   if (user?.role !== "admin" && user?.role !== "moderator") {
     return (
@@ -19,10 +41,14 @@ export default function AdminPage() {
     );
   }
 
-  function review(id: string, status: "approved" | "rejected") {
-    moderateSubmission(id, status, status === "approved" ? "Approved for public showcase." : "Rejected after moderation review.");
-    setSubmissions(getSubmissions());
-    notify(`Submission ${status}.`);
+  async function review(id: string, status: "approved" | "rejected") {
+    try {
+      await moderateSubmission(id, status, status === "approved" ? "Approved for public showcase." : "Rejected after moderation review.");
+      setSubmissions(await getSubmissions(true));
+      notify(`Submission ${status}.`);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Moderation failed.", "error");
+    }
   }
 
   return (
@@ -45,10 +71,10 @@ export default function AdminPage() {
                   <p className="text-muted">{submission.tagline}</p>
                   <p className="mt-2 text-sm">{submission.pitch}</p>
                   <div className="mt-4 flex gap-3">
-                    <button className="button button-primary" onClick={() => review(submission.id, "approved")}>
+                    <button className="button button-primary" onClick={() => void review(submission.id, "approved")}>
                       Approve
                     </button>
-                    <button className="button button-ghost" onClick={() => review(submission.id, "rejected")}>
+                    <button className="button button-ghost" onClick={() => void review(submission.id, "rejected")}>
                       Reject
                     </button>
                   </div>
@@ -62,11 +88,11 @@ export default function AdminPage() {
       <aside className="panel p-5">
         <h2 className="text-xl font-black">Owner Metrics</h2>
         <dl className="mt-4 grid gap-3 text-sm">
-          <Metric label="AI calls" value="demo: local fallback" />
-          <Metric label="AI fallbacks" value="available" />
-          <Metric label="Cost mode" value="free" />
-          <Metric label="Billing capable" value="disabled until env configured" />
-          <Metric label="Emergency switches" value="liveAI, fileUploads" />
+          <Metric label="AI calls this month" value={String(metrics.aiCallsThisMonth)} />
+          <Metric label="Pending submissions" value={String(metrics.pendingSubmissions)} />
+          <Metric label="Live AI flag" value={metrics.liveAI ? "enabled" : "disabled"} />
+          <Metric label="Pricing flag" value={metrics.billing ? "enabled" : "disabled"} />
+          <Metric label="Payments" value="disabled until Stripe phase" />
         </dl>
       </aside>
     </section>

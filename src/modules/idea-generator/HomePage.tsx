@@ -2,8 +2,12 @@ import { Link } from "react-router-dom";
 import { ArrowRight, CalendarDays, Sparkles, Trophy, Zap } from "lucide-react";
 import { analytics } from "../../shared/services/analytics";
 import IdeaGeneratorPage from "./IdeaGeneratorPage";
+import { useSeason } from "../season/SeasonProvider";
+import { useFeatureFlags } from "../../app/featureFlags";
 
 export default function HomePage() {
+  const { season } = useSeason();
+  const { flags } = useFeatureFlags();
   return (
     <div className="grid gap-8">
       <section className="grid items-start gap-6 lg:grid-cols-[1.05fr_0.95fr]">
@@ -54,8 +58,8 @@ export default function HomePage() {
             </div>
             <div className="panel p-5">
               <Zap className="text-indigo-300" aria-hidden="true" />
-              <p className="mt-4 text-3xl font-black">$29</p>
-              <p className="text-sm text-muted">Annual Sprint Pass, one-time purchase</p>
+              <p className="mt-4 text-3xl font-black">{season.year}</p>
+              <p className="text-sm text-muted">Current IdeaInSept season</p>
             </div>
           </div>
           <div className="panel p-5">
@@ -82,7 +86,9 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-      <IdeaGeneratorPage embedded />
+      {flags.aiGenerator ? <IdeaGeneratorPage embedded /> : (
+        <section className="panel p-6"><h2 className="text-2xl font-black">Idea Generator is temporarily paused</h2><p className="mt-2 text-muted">The Sprint Tracker and Showcase remain available.</p></section>
+      )}
     </div>
   );
 }

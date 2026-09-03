@@ -20,6 +20,7 @@
 - Use one-time Checkout for Sprint Pass.
 - Verify webhook signature processing and idempotent event records.
 - Confirm no recurring subscription product is active.
+- Confirm `PAYMENTS_ENABLED=false` and `VITE_PAYMENTS_ENABLED=false` until the dedicated Stripe phase.
 
 ## Accessibility
 
@@ -38,6 +39,7 @@
 - Confirm Netlify Free plan and automatic recharge disabled.
 - Confirm Supabase Free plan with no paid add-ons, branching, replicas, or storage-heavy upload paths.
 - Confirm Gemini project billing is disabled and app has per-user plus global AI limits.
+- Confirm `LIVE_AI_ENABLED=false` until the real-database quota test and owner activation.
 - Upgrade only when verified customer revenue or sustained usage justifies the tier.
 
 ## Rollback

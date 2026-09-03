@@ -1,21 +1,22 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { Lightbulb, Route, Trophy, CreditCard, User, ShieldCheck } from "lucide-react";
-import { AppErrorBoundary } from "../shared/components/ErrorBoundary";
 import { useAuth } from "../modules/auth/AuthProvider";
+import { FeatureFlagKey, useFeatureFlags } from "./featureFlags";
 
 const links = [
   { to: "/", label: "Home", icon: Lightbulb },
-  { to: "/generator", label: "Generator", icon: Lightbulb },
-  { to: "/sprint", label: "My Sprint", icon: Route },
-  { to: "/showcase", label: "Showcase", icon: Trophy },
-  { to: "/pricing", label: "Pricing", icon: CreditCard },
+  { to: "/generator", label: "Generator", icon: Lightbulb, flag: "aiGenerator" as FeatureFlagKey },
+  { to: "/sprint", label: "My Sprint", icon: Route, flag: "sprintTracker" as FeatureFlagKey },
+  { to: "/showcase", label: "Showcase", icon: Trophy, flag: "showcase" as FeatureFlagKey },
+  { to: "/pricing", label: "Pricing", icon: CreditCard, flag: "billing" as FeatureFlagKey },
 ];
 
 export function App() {
   const { user } = useAuth();
+  const { flags } = useFeatureFlags();
+  const visibleLinks = links.filter((link) => !link.flag || flags[link.flag]);
 
   return (
-    <AppErrorBoundary>
       <div className="min-h-screen bg-app text-app">
         <a href="#main" className="skip-link">
           Skip to content
@@ -27,16 +28,16 @@ export function App() {
               <span className="text-amber-400">Sept</span>
             </NavLink>
             <div className="hidden items-center gap-1 md:flex">
-              {links.map(({ to, label, icon: Icon }) => (
+              {visibleLinks.map(({ to, label, icon: Icon }) => (
                 <NavLink key={to} to={to} className={({ isActive }) => `nav-link ${isActive ? "nav-link-active" : ""}`}>
                   <Icon size={17} aria-hidden="true" />
                   {label}
                 </NavLink>
               ))}
-              <NavLink to="/admin" className="nav-link">
+              {user && ["admin", "moderator"].includes(user.role) ? <NavLink to="/admin" className="nav-link">
                 <ShieldCheck size={17} aria-hidden="true" />
                 Admin
-              </NavLink>
+              </NavLink> : null}
             </div>
             <NavLink to="/account" className="button button-ghost">
               <User size={18} aria-hidden="true" />
@@ -44,7 +45,7 @@ export function App() {
             </NavLink>
           </nav>
           <div className="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-4 pb-3 md:hidden">
-            {links.map(({ to, label, icon: Icon }) => (
+            {visibleLinks.map(({ to, label, icon: Icon }) => (
               <NavLink key={to} to={to} className={({ isActive }) => `nav-link shrink-0 ${isActive ? "nav-link-active" : ""}`}>
                 <Icon size={16} aria-hidden="true" />
                 {label}
@@ -64,6 +65,5 @@ export function App() {
           <NavLink to="/contact">Contact</NavLink>
         </footer>
       </div>
-    </AppErrorBoundary>
   );
 }

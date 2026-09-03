@@ -1,16 +1,20 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { ExternalLink, Search, Send, ThumbsUp } from "lucide-react";
 import { useAuth } from "../auth/AuthProvider";
 import { castVote, getApprovedSubmissions, submitProject } from "./showcaseRepository";
 import { ShowcaseSubmission } from "./types";
 import { useToast } from "../../shared/components/Toast";
+import { useSeason } from "../season/SeasonProvider";
+import { LoadingPanel } from "../../shared/components/LoadingPanel";
 
 export default function ShowcasePage() {
   const [query, setQuery] = useState("");
   const [stack, setStack] = useState("");
-  const [submissions, setSubmissions] = useState<ShowcaseSubmission[]>(() => getApprovedSubmissions());
+  const [submissions, setSubmissions] = useState<ShowcaseSubmission[]>([]);
+  const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const { notify } = useToast();
+  const { season } = useSeason();
   const filtered = useMemo(
     () =>
       submissions.filter((submission) => {
@@ -20,19 +24,27 @@ export default function ShowcasePage() {
     [query, stack, submissions],
   );
 
-  function vote(id: string) {
+  useEffect(() => {
+    let active = true;
+    getApprovedSubmissions().then((items) => { if (active) setSubmissions(items); }).catch((error) => notify(error instanceof Error ? error.message : "Showcase could not be loaded.", "error")).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [notify]);
+
+  async function vote(id: string) {
     if (!user) {
       notify("Sign in before voting so one-person-one-vote can be enforced.", "warning");
       return;
     }
     try {
-      castVote(id, user.id);
-      setSubmissions(getApprovedSubmissions());
+      await castVote(id, user.id);
+      setSubmissions(await getApprovedSubmissions());
       notify("Vote counted.");
     } catch (error) {
       notify(error instanceof Error ? error.message : "Vote failed.", "error");
     }
   }
+
+  if (loading) return <LoadingPanel label="Loading the showcase" />;
 
   return (
     <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
@@ -42,7 +54,7 @@ export default function ShowcasePage() {
             <h1 className="text-3xl font-black">Showcase</h1>
             <p className="mt-2 text-muted">Approved projects appear here. Community choice and official judging are displayed separately.</p>
           </div>
-          <span className="chip">2026 season</span>
+          <span className="chip">{season.year} season</span>
         </div>
         <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_220px]">
           <label>
@@ -94,7 +106,7 @@ export default function ShowcasePage() {
                       <ExternalLink size={16} aria-hidden="true" />
                     </a>
                   ) : null}
-                  <button className="button button-primary" onClick={() => vote(submission.id)}>
+                  <button className="button button-primary" onClick={() => void vote(submission.id)}>
                     <ThumbsUp size={17} aria-hidden="true" />
                     Vote
                   </button>
@@ -114,6 +126,7 @@ export default function ShowcasePage() {
 function SubmissionForm() {
   const { user } = useAuth();
   const { notify } = useToast();
+  const { season } = useSeason();
   const [form, setForm] = useState({
     projectName: "",
     tagline: "",
@@ -150,7 +163,7 @@ function SubmissionForm() {
         demoVideoUrl: form.demoVideoUrl || undefined,
         creatorDisplayName: user.displayName,
         creatorPublic: true,
-      });
+      }, season);
       notify("Submitted for moderation. It will stay out of the public feed until approved.");
       setForm({ projectName: "", tagline: "", techStack: "", liveUrl: "", repositoryUrl: "", demoVideoUrl: "", pitch: "", ownsWork: false, acceptsRules: false, company: "" });
     } catch (error) {
@@ -166,7 +179,7 @@ function SubmissionForm() {
         <input className="hidden" tabIndex={-1} autoComplete="off" value={form.company} onChange={(event) => setForm({ ...form, company: event.target.value })} aria-hidden="true" />
         <Field label="Project name" value={form.projectName} onChange={(value) => setForm({ ...form, projectName: value })} required />
         <Field label="Tagline" value={form.tagline} onChange={(value) => setForm({ ...form, tagline: value })} required />
-        <Field label="Tech stack" value={form.techStack} onChange={(value) => setForm({ ...form, techStack: value })} placeholder="React, Supabase, Netlify" required />
+        <Field label="Tools or tech stack" value={form.techStack} onChange={(value) => setForm({ ...form, techStack: value })} placeholder="Canva, WordPress, React, Supabase" required />
         <Field label="Live link" value={form.liveUrl} onChange={(value) => setForm({ ...form, liveUrl: value })} required />
         <Field label="Repository link" value={form.repositoryUrl} onChange={(value) => setForm({ ...form, repositoryUrl: value })} />
         <Field label="Demo video link" value={form.demoVideoUrl} onChange={(value) => setForm({ ...form, demoVideoUrl: value })} />

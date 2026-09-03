@@ -28,7 +28,7 @@ test("submitted project stays out of public feed until approved and duplicate vo
   await page.goto("/showcase");
   await page.getByLabel("Project name").fill("QuietLaunch");
   await page.getByLabel("Tagline").fill("A calm launch board");
-  await page.getByLabel("Tech stack").fill("React, Supabase");
+  await page.getByLabel("Tools or tech stack").fill("React, Supabase");
   await page.getByLabel("Live link").fill("https://example.com/quietlaunch");
   await page.getByLabel("Pitch").fill("A finished September project that keeps launch work visible without noise.");
   await page.getByLabel(/authorized/).check();
