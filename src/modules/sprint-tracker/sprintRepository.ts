@@ -1,10 +1,8 @@
 import { GeneratedIdea } from "../idea-generator/types";
-import { readJson, writeJson } from "../../shared/lib/storage";
 import { supabase } from "../../shared/services/supabase";
 import { Season } from "../season/types";
 import { Sprint, SprintDay, SprintDayStatus } from "./types";
 
-const ACTIVE_SPRINT_KEY = "ideainsept.v2.demoActiveSprint";
 
 function isoDateFromDay(year: number, dayNumber: number) {
   return new Date(Date.UTC(year, 8, dayNumber)).toISOString().slice(0, 10);
@@ -58,15 +56,7 @@ const sprintSelect = "*, seasons(year), ideas(*), sprint_days(*), milestones(*)"
 export async function createSprintFromIdea(idea: GeneratedIdea, ownerId: string, season: Season, persistedIdeaId?: string): Promise<Sprint> {
   const days = buildDefaultDays(season.year);
   const milestones = defaultMilestones(season.year);
-  if (!supabase) {
-    const sprint: Sprint = {
-      id: crypto.randomUUID(), ownerId, seasonYear: season.year, idea, title: idea.title, promise: idea.promise,
-      status: "active", visibility: "private", startDate: days[0].date, targetLaunchDate: days[29].date,
-      primary: true, days, milestones,
-    };
-    writeJson(ACTIVE_SPRINT_KEY, sprint);
-    return sprint;
-  }
+  if (!supabase) throw new Error("Sprint storage is not configured.");
   const { data: sprintRow, error } = await supabase.from("sprints").insert({
     owner_id: ownerId, season_id: season.id, idea_id: persistedIdeaId || null, title: idea.title,
     one_sentence_promise: idea.promise, status: "active", visibility: "private",
@@ -85,7 +75,7 @@ export async function createSprintFromIdea(idea: GeneratedIdea, ownerId: string,
 }
 
 export async function getActiveSprint(ownerId?: string, seasonId?: string) {
-  if (!supabase) return readJson<Sprint | null>(ACTIVE_SPRINT_KEY, null);
+  if (!supabase) return null;
   if (!ownerId || !seasonId) return null;
   const { data, error } = await supabase.from("sprints").select(sprintSelect).eq("owner_id", ownerId).eq("season_id", seasonId).eq("primary_sprint", true).maybeSingle();
   if (error) throw error;
@@ -93,13 +83,7 @@ export async function getActiveSprint(ownerId?: string, seasonId?: string) {
 }
 
 export async function updateSprintDay(sprintId: string, dayNumber: number, patch: Partial<SprintDay>) {
-  if (!supabase) {
-    const sprint = await getActiveSprint();
-    if (!sprint) return null;
-    const next = { ...sprint, days: sprint.days.map((day) => day.dayNumber === dayNumber ? { ...day, ...patch, updatedAt: new Date().toISOString() } : day) };
-    writeJson(ACTIVE_SPRINT_KEY, next);
-    return next;
-  }
+  if (!supabase) throw new Error("Sprint storage is not configured.");
   const values: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (patch.status !== undefined) values.status = patch.status;
   if (patch.summary !== undefined) values.summary = patch.summary;
@@ -112,13 +96,7 @@ export async function updateSprintDay(sprintId: string, dayNumber: number, patch
 }
 
 export async function updateMilestone(sprintId: string, milestoneId: string, completed: boolean) {
-  if (!supabase) {
-    const sprint = await getActiveSprint();
-    if (!sprint) return null;
-    const next = { ...sprint, milestones: sprint.milestones.map((item) => item.id === milestoneId ? { ...item, completedAt: completed ? new Date().toISOString() : undefined } : item) };
-    writeJson(ACTIVE_SPRINT_KEY, next);
-    return next;
-  }
+  if (!supabase) throw new Error("Sprint storage is not configured.");
   const { error } = await supabase.from("milestones").update({ completed_at: completed ? new Date().toISOString() : null }).eq("sprint_id", sprintId).eq("id", milestoneId);
   if (error) throw error;
   return null;

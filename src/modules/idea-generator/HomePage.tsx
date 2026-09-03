@@ -38,7 +38,7 @@ export default function HomePage() {
           </div>
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
             {[
-              ["Discover", "AI plus curated fallbacks turn constraints into a focused build."],
+              ["Discover", "AI and curated idea paths turn constraints into a focused build."],
               ["Commit", "A 30-day sprint creates daily logs, milestones, and recovery paths."],
               ["Showcase", "Moderated submissions and community choice turn shipping into recognition."],
             ].map(([title, body]) => (
@@ -63,22 +63,8 @@ export default function HomePage() {
             </div>
           </div>
           <div className="panel p-5">
-            <div className="flex items-center justify-between">
-              <h2 className="font-black">Sprint Snapshot</h2>
-              <span className="chip">Day 12</span>
-            </div>
-            <div className="mt-4 grid grid-cols-10 gap-1.5" aria-label="Example 30 day progress grid">
-              {Array.from({ length: 30 }, (_, index) => (
-                <span
-                  key={index}
-                  className={`aspect-square rounded-md border text-center text-xs leading-7 ${
-                    index < 11 ? "border-emerald-400/40 bg-emerald-400/16 text-emerald-100" : "border-white/10 bg-white/5 text-muted"
-                  }`}
-                >
-                  {index + 1}
-                </span>
-              ))}
-            </div>
+            <h2 className="font-black">Your Sprint Workspace</h2>
+            <p className="mt-3 text-sm text-muted">After you commit, this is where your real daily logs, milestone progress, and recovery plan live.</p>
             <Link to="/sprint" className="button button-secondary mt-5 w-full">
               Open My Sprint
               <ArrowRight size={17} aria-hidden="true" />

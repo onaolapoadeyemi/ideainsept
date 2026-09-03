@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-The app runs without paid credentials. In that explicit local-demo mode, idea generation uses curated fallback templates and test data may use localStorage. When Supabase browser values are configured, demo authentication is disabled and authenticated product data is written to Supabase under RLS.
+The deployed application requires Supabase authentication and persists authenticated product data in Supabase under row-level security. Curated ideas provide a cost-safe server response when live AI is paused or unavailable.
 
 ## Environment
 

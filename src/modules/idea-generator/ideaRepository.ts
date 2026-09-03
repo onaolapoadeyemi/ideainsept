@@ -1,27 +1,16 @@
 import { ideaGenerationResponseSchema, ideaRequestSchema } from "./validation";
 import { GeneratedIdea, IdeaRequest } from "./types";
-import { matchFallbackIdeas } from "./fallbackIdeas";
 import { analytics } from "../../shared/services/analytics";
-import { readJson, writeJson } from "../../shared/lib/storage";
 import { apiFetch } from "../../shared/services/api";
 import { supabase } from "../../shared/services/supabase";
 
-const GUEST_GENERATION_KEY = "ideainsept.v2.guestGenerationUsed";
-const ANONYMOUS_ID_KEY = "ideainsept.v2.anonymousId";
-const SAVED_IDEAS_KEY = "ideainsept.v2.demoSavedIdeas";
-
 function anonymousId() {
-  const existing = readJson<string | null>(ANONYMOUS_ID_KEY, null);
-  if (existing) return existing;
-  const next = crypto.randomUUID();
-  writeJson(ANONYMOUS_ID_KEY, next);
-  return next;
+  return crypto.randomUUID();
 }
 
 export async function generateIdeas(request: IdeaRequest): Promise<GeneratedIdea[]> {
   const parsed = ideaRequestSchema.parse(request);
   analytics.track("idea_generation_started", { guest: parsed.guest, buildType: parsed.buildType });
-  if (parsed.guest && readJson<boolean>(GUEST_GENERATION_KEY, false)) return matchFallbackIdeas(parsed, 1);
   try {
     const response = await apiFetch("/api/generate-idea", {
       method: "POST",
@@ -29,24 +18,16 @@ export async function generateIdeas(request: IdeaRequest): Promise<GeneratedIdea
     });
     if (!response.ok) throw new Error("Server generation unavailable");
     const data = ideaGenerationResponseSchema.parse(await response.json());
-    if (parsed.guest) writeJson(GUEST_GENERATION_KEY, true);
     analytics.track("idea_generation_succeeded", { source: data.usage.liveAiUsed ? "ai" : "curated" });
     return data.ideas;
-  } catch {
-    const fallback = matchFallbackIdeas(parsed, parsed.guest ? 1 : 3);
-    if (parsed.guest) writeJson(GUEST_GENERATION_KEY, true);
-    analytics.track("idea_generation_failed", { fallback: true });
-    return fallback;
+  } catch (error) {
+    analytics.track("idea_generation_failed", { source: "server" });
+    throw error instanceof Error ? error : new Error("Idea generation is temporarily unavailable.");
   }
 }
 
 export async function saveIdea(idea: GeneratedIdea, ownerId?: string, seasonId?: string) {
-  if (!supabase || !ownerId) {
-    const saved = readJson<GeneratedIdea[]>(SAVED_IDEAS_KEY, []);
-    if (!saved.some((item) => item.id === idea.id)) writeJson(SAVED_IDEAS_KEY, [idea, ...saved].slice(0, 20));
-    analytics.track("idea_saved", { source: idea.source });
-    return idea.id;
-  }
+  if (!supabase || !ownerId) throw new Error("Sign in to save an idea.");
   if (!seasonId) throw new Error("Select an active season before saving an idea.");
   const { data, error } = await supabase.from("ideas").insert({
     owner_id: ownerId, season_id: seasonId, title: idea.title, summary: idea.promise,
@@ -61,7 +42,7 @@ export async function saveIdea(idea: GeneratedIdea, ownerId?: string, seasonId?:
 }
 
 export async function getSavedIdeas(ownerId?: string, seasonId?: string) {
-  if (!supabase) return readJson<GeneratedIdea[]>(SAVED_IDEAS_KEY, []);
+  if (!supabase) return [];
   if (!ownerId || !seasonId) return [];
   const { data, error } = await supabase.from("ideas").select("*").eq("owner_id", ownerId).eq("season_id", seasonId).order("created_at", { ascending: false });
   if (error) throw error;

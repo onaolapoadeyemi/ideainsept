@@ -5,10 +5,10 @@ import { Season } from "./types";
 type SeasonContextValue = { season: Season; loading: boolean; refresh: () => Promise<void> };
 const SeasonContext = createContext<SeasonContextValue | null>(null);
 
-function localSeason(): Season {
+function unconfiguredSeason(): Season {
   const year = new Date().getUTCFullYear();
   return {
-    id: `demo-${year}`,
+    id: "unconfigured",
     year,
     name: `IdeaInSept ${year}`,
     timezone: "America/Chicago",
@@ -39,7 +39,7 @@ function mapSeason(row: Record<string, unknown>): Season {
 }
 
 export function SeasonProvider({ children }: PropsWithChildren) {
-  const [season, setSeason] = useState(localSeason);
+  const [season, setSeason] = useState(unconfiguredSeason);
   const [loading, setLoading] = useState(Boolean(supabase));
 
   async function refresh() {
@@ -53,7 +53,7 @@ export function SeasonProvider({ children }: PropsWithChildren) {
       .limit(1)
       .maybeSingle();
     if (error) {
-      console.warn("Season configuration unavailable; using the safe local season.", error.message);
+      console.warn("Season configuration is unavailable.", error.message);
       setLoading(false);
       return;
     }

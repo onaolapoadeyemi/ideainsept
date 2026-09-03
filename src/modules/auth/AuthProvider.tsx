@@ -1,7 +1,6 @@
 import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { analytics } from "../../shared/services/analytics";
-import { readJson, writeJson } from "../../shared/lib/storage";
 import { hasSupabaseClientConfig } from "../../app/config";
 import { supabase } from "../../shared/services/supabase";
 
@@ -16,13 +15,10 @@ type AuthContextValue = {
   user: AppUser | null;
   session: Session | null;
   loading: boolean;
-  isDemo: boolean;
   signInWithGitHub: () => Promise<void>;
-  signInWithDemo: (email?: string) => void;
   signOut: () => Promise<void>;
 };
 
-const AUTH_KEY = "ideainsept.v2.demoUser";
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function displayNameFor(user: User) {
@@ -42,9 +38,7 @@ async function toAppUser(user: User): Promise<AppUser> {
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<AppUser | null>(() =>
-    hasSupabaseClientConfig ? null : readJson<AppUser | null>(AUTH_KEY, null),
-  );
+  const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(hasSupabaseClientConfig);
 
   useEffect(() => {
@@ -75,9 +69,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
       user,
       session,
       loading,
-      isDemo: !hasSupabaseClientConfig,
       async signInWithGitHub() {
-        if (!supabase) throw new Error("GitHub sign-in is unavailable in local demo mode.");
+        if (!supabase) throw new Error("Secure sign-in is not configured yet.");
         analytics.track("signup_started", { method: "github" });
         const { error } = await supabase.auth.signInWithOAuth({
           provider: "github",
@@ -85,21 +78,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
         });
         if (error) throw error;
       },
-      signInWithDemo(email = "builder@example.com") {
-        if (hasSupabaseClientConfig) throw new Error("Demo sign-in is disabled in configured deployments.");
-        const nextUser: AppUser = {
-          id: "00000000-0000-4000-8000-000000000001",
-          email,
-          displayName: email.split("@")[0] || "Builder",
-          role: email.includes("admin") ? "admin" : "user",
-        };
-        writeJson(AUTH_KEY, nextUser);
-        setUser(nextUser);
-        analytics.track("signup_completed", { method: "demo" });
-      },
       async signOut() {
         if (supabase) await supabase.auth.signOut();
-        localStorage.removeItem(AUTH_KEY);
         setSession(null);
         setUser(null);
       },

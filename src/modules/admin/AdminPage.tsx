@@ -5,7 +5,6 @@ import { getSubmissions, moderateSubmission } from "../showcase/showcaseReposito
 import { ShowcaseSubmission } from "../showcase/types";
 import { useToast } from "../../shared/components/Toast";
 import { apiFetch } from "../../shared/services/api";
-import { hasSupabaseClientConfig } from "../../app/config";
 
 export default function AdminPage() {
   const { user } = useAuth();
@@ -15,10 +14,6 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (user?.role !== "admin" && user?.role !== "moderator") return;
-    if (!hasSupabaseClientConfig) {
-      getSubmissions(true).then(setSubmissions).catch((error) => notify(error instanceof Error ? error.message : "Moderation queue could not be loaded.", "error"));
-      return;
-    }
     Promise.all([
       getSubmissions(true),
       apiFetch("/api/admin-metrics").then(async (response) => {
@@ -36,7 +31,7 @@ export default function AdminPage() {
     return (
       <section className="panel p-6">
         <h1 className="text-3xl font-black">Admin</h1>
-        <p className="mt-3 text-muted">Moderator access is enforced by server-side roles and RLS in production. Use an email containing admin in demo mode to preview this surface.</p>
+        <p className="mt-3 text-muted">Moderator access is enforced by server-side roles and row-level security.</p>
       </section>
     );
   }
@@ -92,7 +87,7 @@ export default function AdminPage() {
           <Metric label="Pending submissions" value={String(metrics.pendingSubmissions)} />
           <Metric label="Live AI flag" value={metrics.liveAI ? "enabled" : "disabled"} />
           <Metric label="Pricing flag" value={metrics.billing ? "enabled" : "disabled"} />
-          <Metric label="Payments" value="disabled until Stripe phase" />
+          <Metric label="Payments" value={metrics.billing ? "enabled" : "paused"} />
         </dl>
       </aside>
     </section>

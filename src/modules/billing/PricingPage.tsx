@@ -33,7 +33,7 @@ export default function PricingPage() {
     <section className="grid gap-5 lg:grid-cols-2">
       <article className="panel p-6">
         <h1 className="text-3xl font-black">Free Explorer</h1>
-        <p className="mt-3 text-muted">One no-signup idea, a tightly limited live-AI allowance with unlimited curated fallbacks, one active sprint, and one public showcase submission.</p>
+        <p className="mt-3 text-muted">One no-signup idea, a tightly limited live-AI allowance, curated idea options, one active sprint, and one public showcase submission.</p>
         <ul className="mt-6 grid gap-3 text-sm">
           {["AI idea generator", "30-day sprint tracker", "Community voting", "One public showcase submission"].map((item) => (
             <li key={item} className="flex gap-2">

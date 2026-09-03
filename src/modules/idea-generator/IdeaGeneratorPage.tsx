@@ -36,18 +36,22 @@ export default function IdeaGeneratorPage({ embedded = false }: { embedded?: boo
   async function submit(event: FormEvent) {
     event.preventDefault();
     setLoading(true);
-    const generated = await generateIdeas({ ...request, guest: !user });
-    setIdeas(generated);
-    setSelectedId(generated[0]?.id ?? null);
-    setLoading(false);
+    try {
+      const generated = await generateIdeas({ ...request, guest: !user });
+      setIdeas(generated);
+      setSelectedId(generated[0]?.id ?? null);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Idea generation is temporarily unavailable.", "error");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function commit() {
     if (!selectedIdea) return;
     analytics.track("sprint_commit_started", { source: selectedIdea.source });
     if (!user) {
-      await saveIdea(selectedIdea);
-      notify("Sign in to commit. Your generated idea has been preserved locally.", "warning");
+      notify("Sign in to save your idea and commit to a sprint.", "warning");
       navigate("/account");
       return;
     }
@@ -69,7 +73,7 @@ export default function IdeaGeneratorPage({ embedded = false }: { embedded?: boo
           <Sparkles className="text-amber-300" aria-hidden="true" />
           <div>
             <h1 className="text-2xl font-black">AI Idea Generator</h1>
-            <p className="text-sm text-muted">One useful guest idea before signup. Fallbacks work even when live AI is off.</p>
+            <p className="text-sm text-muted">Try one curated idea before signing in. Signed-in builders can save and commit their work.</p>
           </div>
         </div>
         <div className="mt-5 grid gap-4">
@@ -193,7 +197,7 @@ export default function IdeaGeneratorPage({ embedded = false }: { embedded?: boo
           </div>
         )}
         <Paywall feature="Refine and plan with AI" benefit="Sprint Pass unlocks refinement, pivot suggestions, and an AI-generated 30-day execution plan before the $29 price appears." />
-        <p className="text-xs text-muted">Free live-AI allowance: {freeEntitlement.aiGenerationsPerSeason} requests within the configured quota window. Curated generation remains available when the live limit is reached.</p>
+        <p className="text-xs text-muted">Free live-AI allowance: {freeEntitlement.aiGenerationsPerSeason} requests within the configured quota window. Curated ideas remain available when the live limit is reached.</p>
         {!embedded && (
           <Link to="/showcase" className="button button-secondary justify-self-start">
             Explore the Showcase
