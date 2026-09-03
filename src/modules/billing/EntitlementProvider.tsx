@@ -1,4 +1,4 @@
-import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { supabase } from "../../shared/services/supabase";
 import { useAuth } from "../auth/AuthProvider";
 import { useSeason } from "../season/SeasonProvider";
@@ -13,7 +13,7 @@ export function EntitlementProvider({ children }: PropsWithChildren) {
   const [entitlement, setEntitlement] = useState<Entitlement>({ ...freeEntitlement, seasonYear: season.year });
   const [loading, setLoading] = useState(Boolean(supabase && user));
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     if (!supabase || !user) {
       setEntitlement({ ...freeEntitlement, seasonYear: season.year });
       setLoading(false);
@@ -29,10 +29,10 @@ export function EntitlementProvider({ children }: PropsWithChildren) {
     }
     setEntitlement(data ? { ...sprintPassEntitlement, seasonYear: season.year } : { ...freeEntitlement, seasonYear: season.year });
     setLoading(false);
-  }
+  }, [season.year, user]);
 
-  useEffect(() => { void refresh(); }, [season.year, user?.id]);
-  const value = useMemo(() => ({ entitlement, loading, refresh }), [entitlement, loading]);
+  useEffect(() => { void refresh(); }, [refresh]);
+  const value = useMemo(() => ({ entitlement, loading, refresh }), [entitlement, loading, refresh]);
   return <EntitlementContext.Provider value={value}>{children}</EntitlementContext.Provider>;
 }
 
