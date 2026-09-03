@@ -20,13 +20,14 @@ export default function PricingPage() {
       notify("Sign in before purchasing so the pass can be linked to your account.", "warning");
       return;
     }
-    const response = await apiFetch("/api/create-checkout-session", { method: "POST" });
-    if (!response.ok) {
-      notify("Stripe is not configured yet. Add test credentials to enable checkout.", "warning");
-      return;
+    try {
+      const response = await apiFetch("/api/create-checkout-session", { method: "POST" });
+      const data = (await response.json()) as { url?: string; error?: { message?: string } };
+      if (!response.ok || !data.url) throw new Error(data.error?.message || "Checkout could not be started.");
+      window.location.assign(data.url);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Checkout could not be started.", "warning");
     }
-    const data = (await response.json()) as { url: string };
-    window.location.assign(data.url);
   }
 
   return (
