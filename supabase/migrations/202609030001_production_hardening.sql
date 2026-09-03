@@ -49,7 +49,7 @@ create or replace function public.is_moderator_or_admin()
 returns boolean
 language sql
 stable
-security definer
+security invoker
 set search_path = ''
 as $$
   select (select auth.uid()) is not null and exists (
@@ -101,6 +101,7 @@ create policy "judging_admin" on public.judging_scores for all to authenticated 
 create policy "purchases_own_read" on public.purchases for select to authenticated using (user_id = (select auth.uid()));
 create policy "entitlements_own_read" on public.entitlements for select to authenticated using (user_id = (select auth.uid()));
 create policy "ai_usage_own_read" on public.ai_usage for select to authenticated using (user_id = (select auth.uid()));
+create policy "newsletter_consent_insert" on public.newsletter_subscribers for insert to anon, authenticated with check (status = 'consented');
 
 revoke all on all tables in schema public from anon, authenticated;
 grant select on public.seasons, public.feature_flags to anon, authenticated;
@@ -108,6 +109,7 @@ grant select on public.profiles, public.sprints, public.showcase_submissions, pu
 grant select, insert, update on public.profiles, public.ideas, public.sprints, public.sprint_days, public.milestones, public.showcase_submissions to authenticated;
 grant insert on public.votes to authenticated;
 grant select on public.purchases, public.entitlements, public.ai_usage, public.judging_scores to authenticated;
+grant insert on public.newsletter_subscribers to anon, authenticated;
 grant select, insert, update, delete on all tables in schema public to service_role;
 grant usage, select on all sequences in schema public to service_role;
 
@@ -162,13 +164,13 @@ security definer
 set search_path = ''
 as $$
 declare
-  season_year integer;
+  v_season_year integer;
   sprint_limit integer := 1;
   current_count integer;
 begin
   if new.owner_id <> (select auth.uid()) then raise exception 'Sprint owner does not match the authenticated user'; end if;
-  select year into season_year from public.seasons where id = new.season_id;
-  if exists (select 1 from public.entitlements where user_id = new.owner_id and status = 'active' and public.entitlements.season_year = season_year and ends_at > now()) then sprint_limit := 3; end if;
+  select year into v_season_year from public.seasons where id = new.season_id;
+  if exists (select 1 from public.entitlements where user_id = new.owner_id and status = 'active' and public.entitlements.season_year = v_season_year and ends_at > now()) then sprint_limit := 3; end if;
   select count(*) into current_count from public.sprints where owner_id = new.owner_id and season_id = new.season_id and status not in ('archived');
   if current_count >= sprint_limit then raise exception 'Active sprint limit reached for this season'; end if;
   return new;
