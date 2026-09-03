@@ -1,4 +1,5 @@
-import { Check, Zap } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, LoaderCircle, Zap } from "lucide-react";
 import { analytics } from "../../shared/services/analytics";
 import { useToast } from "../../shared/components/Toast";
 import { apiFetch } from "../../shared/services/api";
@@ -9,7 +10,42 @@ import { useEntitlement } from "./EntitlementProvider";
 export default function PricingPage() {
   const { notify } = useToast();
   const { user } = useAuth();
-  const { entitlement } = useEntitlement();
+  const { entitlement, refresh } = useEntitlement();
+  const checkoutStatus = new URLSearchParams(window.location.search).get("checkout");
+  const [syncingPurchase, setSyncingPurchase] = useState(checkoutStatus === "success" && entitlement.plan !== "sprint_pass");
+  const notified = useRef(false);
+
+  useEffect(() => {
+    if (checkoutStatus !== "success" || !user) return;
+
+    if (entitlement.plan === "sprint_pass") {
+      setSyncingPurchase(false);
+      if (!notified.current) {
+        notified.current = true;
+        analytics.track("checkout_completed", { plan: "sprint_pass" });
+        notify("Payment confirmed. Your Sprint Pass is active.", "success");
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+      return;
+    }
+
+    let cancelled = false;
+    let attempts = 0;
+    setSyncingPurchase(true);
+    const poll = async () => {
+      if (cancelled) return;
+      attempts += 1;
+      await refresh();
+      if (!cancelled && attempts < 12) window.setTimeout(poll, 1250);
+      if (!cancelled && attempts >= 12) {
+        setSyncingPurchase(false);
+        notify("Your payment was received, but access is still syncing. Refresh this page in a moment.", "info");
+      }
+    };
+    void poll();
+    return () => { cancelled = true; };
+  }, [checkoutStatus, entitlement.plan, notify, refresh, user]);
+
   async function startCheckout() {
     analytics.track("checkout_started", { plan: "sprint_pass" });
     if (!clientConfig.paymentsEnabled) {
@@ -61,9 +97,14 @@ export default function PricingPage() {
             </li>
           ))}
         </ul>
-        <button className="button button-primary mt-6" onClick={startCheckout} disabled={!clientConfig.paymentsEnabled || entitlement.plan === "sprint_pass"}>
-          <Zap size={18} aria-hidden="true" />
-          {entitlement.plan === "sprint_pass" ? "Sprint Pass Active" : clientConfig.paymentsEnabled ? "Upgrade Now" : "Payments Coming Next"}
+        {syncingPurchase && (
+          <p className="mt-6 text-sm text-amber-200" role="status">
+            Confirming your payment and opening Sprint Pass access…
+          </p>
+        )}
+        <button className="button button-primary mt-6" onClick={startCheckout} disabled={!clientConfig.paymentsEnabled || entitlement.plan === "sprint_pass" || syncingPurchase}>
+          {syncingPurchase ? <LoaderCircle className="animate-spin" size={18} aria-hidden="true" /> : <Zap size={18} aria-hidden="true" />}
+          {entitlement.plan === "sprint_pass" ? "Sprint Pass Active" : syncingPurchase ? "Activating Pass…" : clientConfig.paymentsEnabled ? "Upgrade Now" : "Payments Coming Next"}
         </button>
       </article>
     </section>
