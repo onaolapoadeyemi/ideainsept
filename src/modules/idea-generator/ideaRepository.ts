@@ -54,3 +54,10 @@ export async function getSavedIdeas(ownerId?: string, seasonId?: string) {
     complexity: row.model_metadata?.complexity || "medium", confidence: row.model_metadata?.confidence || 78, source: row.source,
   })) as GeneratedIdea[];
 }
+
+export function buildIdeaGuidance(idea: GeneratedIdea) {
+  return {
+    refine: `Reduce ${idea.title} to one ${idea.targetUser.toLowerCase()} outcome: ${idea.septemberScope}`,
+    pivot: `If the first audience is slow to reach, reframe ${idea.title} around ${idea.painfulProblem.toLowerCase()} for a smaller, easier-to-contact niche.`,
+  };
+}

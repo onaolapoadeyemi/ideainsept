@@ -64,6 +64,7 @@ export default function AdminPage() {
                 <article key={submission.id} className="rounded-lg border border-white/10 p-4">
                   <h2 className="text-xl font-black">{submission.projectName}</h2>
                   <p className="text-muted">{submission.tagline}</p>
+                  {submission.priorityReview ? <p className="mt-2 text-xs font-bold text-amber-200">Sprint Pass priority review</p> : null}
                   <p className="mt-2 text-sm">{submission.pitch}</p>
                   <div className="mt-4 flex gap-3">
                     <button className="button button-primary" onClick={() => void review(submission.id, "approved")}>
