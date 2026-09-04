@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { Check, LoaderCircle, Zap } from "lucide-react";
 import { analytics } from "../../shared/services/analytics";
 import { useToast } from "../../shared/components/Toast";
@@ -81,7 +82,7 @@ export default function PricingPage() {
       </article>
       <article className="panel border-amber-400/60 p-6">
         <h1 className="text-3xl font-black">$29 Sprint Pass</h1>
-        <p className="mt-3 text-muted">A one-time annual season pass. No automatic renewal is enabled in this MVP.</p>
+        <p className="mt-3 text-muted">A one-time annual season pass. No automatic renewal is enabled.</p>
         <ul className="mt-6 grid gap-3 text-sm">
           {[
             "Up to 50 live-AI generations when the free quota is available, with curated ideas always available",
@@ -96,6 +97,7 @@ export default function PricingPage() {
             </li>
           ))}
         </ul>
+        <p className="mt-5 text-sm text-muted">Not satisfied with premium features as described? Request a refund within 14 days of purchase. <Link to="/terms" className="text-amber-300 underline">Read the full refund policy</Link>.</p>
         {syncingPurchase && (
           <p className="mt-6 text-sm text-amber-200" role="status">
             Confirming your payment and opening Sprint Pass access…
