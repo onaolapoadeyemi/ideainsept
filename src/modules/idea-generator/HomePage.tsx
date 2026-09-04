@@ -4,12 +4,15 @@ import { analytics } from "../../shared/services/analytics";
 import IdeaGeneratorPage from "./IdeaGeneratorPage";
 import { useSeason } from "../season/SeasonProvider";
 import { useFeatureFlags } from "../../app/featureFlags";
+import NewsletterSignup from "../newsletter/NewsletterSignup";
+import SeasonStatusBanner from "../season/SeasonStatusBanner";
 
 export default function HomePage() {
   const { season } = useSeason();
   const { flags } = useFeatureFlags();
   return (
     <div className="grid gap-8">
+      <SeasonStatusBanner />
       <section className="grid items-start gap-6 lg:grid-cols-[1.05fr_0.95fr]">
         <div className="pt-4 lg:pt-8">
           <h1 className="max-w-4xl text-4xl font-black leading-tight sm:text-5xl lg:text-[3.65rem]">
@@ -75,6 +78,7 @@ export default function HomePage() {
       {flags.aiGenerator ? <IdeaGeneratorPage embedded /> : (
         <section className="panel p-6"><h2 className="text-2xl font-black">Idea Generator is temporarily paused</h2><p className="mt-2 text-muted">The Sprint Tracker and Showcase remain available.</p></section>
       )}
+      {flags.newsletter ? <NewsletterSignup /> : null}
     </div>
   );
 }
