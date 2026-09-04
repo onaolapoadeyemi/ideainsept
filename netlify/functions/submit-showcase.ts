@@ -1,6 +1,6 @@
 import type { Handler } from "@netlify/functions";
 import { z } from "zod";
-import { errorResponse, json, parseJson, requireUser, supabaseAdmin } from "./_shared";
+import { assertSeasonPhase, errorResponse, getSeasonForId, json, parseJson, requireSprintPass, requireUser, supabaseAdmin } from "./_shared";
 import { publicUrlSchema } from "../../src/shared/lib/urls";
 
 const schema = z.object({
@@ -24,9 +24,18 @@ export const handler: Handler = async (event) => {
     const user = await requireUser(event.headers.authorization);
     const body = await parseJson(event.body, schema, 5000);
     const supabase = supabaseAdmin();
+    const season = await getSeasonForId(body.seasonId);
+    assertSeasonPhase(season, "submission");
     const { data: sprint, error: sprintError } = await supabase.from("sprints").select("id, season_id").eq("id", body.sprintId).eq("owner_id", user.id).eq("season_id", body.seasonId).maybeSingle();
     if (sprintError) throw sprintError;
     if (!sprint) throw new Error("The selected sprint does not belong to this user and season.");
+    let priorityReview = false;
+    try {
+      await requireSprintPass(user.id, body.seasonId);
+      priorityReview = true;
+    } catch (error) {
+      if (!(error instanceof Error) || !error.message.includes("Sprint Pass")) throw error;
+    }
     const { data, error } = await supabase
       .from("showcase_submissions")
       .insert({
@@ -41,6 +50,7 @@ export const handler: Handler = async (event) => {
         repository_url: body.repositoryUrl,
         demo_video_url: body.demoVideoUrl,
         moderation_status: "pending",
+        priority_review: priorityReview,
         submitted_at: new Date().toISOString(),
       })
       .select("id, moderation_status")

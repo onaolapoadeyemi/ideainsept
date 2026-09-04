@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { CalendarDays, Download, Save } from "lucide-react";
+import { CalendarDays, Download, Save, Sparkles } from "lucide-react";
 import { Paywall } from "../billing/Paywall";
 import { calculateProgress, supportiveRecoveryCopy } from "./calculations";
-import { getActiveSprint, updateMilestone, updateSprintDay } from "./sprintRepository";
+import { getActiveSprint, updateMilestone, updateSprintDay, updateSprintVisibility } from "./sprintRepository";
+import { apiFetch } from "../../shared/services/api";
 import { Sprint, SprintDayStatus } from "./types";
 import { analytics } from "../../shared/services/analytics";
 import { useToast } from "../../shared/components/Toast";
@@ -17,6 +18,8 @@ export default function SprintTrackerPage() {
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState(1);
   const [saveState, setSaveState] = useState("Saved");
+  const [plan, setPlan] = useState<Array<{ dayNumber: number; focus: string; nextAction: string }> | null>(null);
+  const [planning, setPlanning] = useState(false);
   const { notify } = useToast();
   const { user, loading: authLoading } = useAuth();
   const { season, loading: seasonLoading } = useSeason();
@@ -64,6 +67,25 @@ export default function SprintTrackerPage() {
       setSaveState("Save failed");
     });
     if (patch.status === "completed") analytics.track("sprint_day_completed", { day: selectedDay });
+  }
+
+  async function generatePlan() {
+    if (!sprint || entitlement.plan !== "sprint_pass") {
+      notify("A Sprint Pass is required for the execution plan.", "warning");
+      return;
+    }
+    setPlanning(true);
+    try {
+      const response = await apiFetch("/api/generate-sprint-plan", { method: "POST", body: JSON.stringify({ sprintId: sprint.id, ideaTitle: sprint.title }) });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error?.message || "Plan could not be generated.");
+      setPlan(body.days || []);
+      notify("Your 30-day execution plan is ready.");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Plan could not be generated.", "error");
+    } finally {
+      setPlanning(false);
+    }
   }
 
   return (
@@ -184,6 +206,33 @@ export default function SprintTrackerPage() {
                 />
               </label>
             ))}
+          </div>
+        </div>
+        <div className="panel p-5">
+          <h2 className="text-xl font-black">Sprint Pass tools</h2>
+          <div className="mt-4 grid gap-3">
+            <button className="button button-secondary" type="button" onClick={() => void generatePlan()} disabled={planning}>
+              <Sparkles size={18} aria-hidden="true" />
+              {planning ? "Building plan…" : "Create 30-Day Execution Plan"}
+            </button>
+            <label>
+              <span className="label">Sprint visibility</span>
+              <select
+                className="field"
+                value={sprint.visibility}
+                disabled={entitlement.plan !== "sprint_pass"}
+                onChange={(event) => {
+                  const visibility = event.target.value as Sprint["visibility"];
+                  if (visibility === "unlisted" && entitlement.plan !== "sprint_pass") return;
+                  setSprint((current) => current ? { ...current, visibility } : current);
+                  void updateSprintVisibility(sprint.id, visibility).then(() => notify(`Sprint visibility set to ${visibility}.`)).catch((error) => notify(error instanceof Error ? error.message : "Visibility could not be saved.", "error"));
+                }}
+              >
+                <option value="private">Private</option>
+                <option value="unlisted">Unlisted (Sprint Pass)</option>
+              </select>
+            </label>
+            {plan ? <ol className="max-h-64 list-decimal space-y-2 overflow-y-auto pl-5 text-sm text-muted">{plan.map((item) => <li key={item.dayNumber}><span className="font-bold text-white">Day {item.dayNumber}: {item.focus}.</span> {item.nextAction}</li>)}</ol> : null}
           </div>
         </div>
         <Paywall feature="Export sprint report" benefit="Sprint Pass creates a clean report with milestones, streaks, and private notes for your portfolio or sponsor update." />

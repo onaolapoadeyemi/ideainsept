@@ -94,6 +94,48 @@ export async function getActiveSeason() {
   return data;
 }
 
+export async function getSeasonForId(seasonId: string) {
+  const { data, error } = await supabaseAdmin().from("seasons").select("*").eq("id", seasonId).maybeSingle();
+  if (error) throw error;
+  if (!data) throw new AppError("validation", "The selected season does not exist.", 404);
+  return data;
+}
+
+type SeasonPhase = "idea" | "build" | "submission" | "voting" | "judging";
+
+export function assertSeasonPhase(season: Record<string, unknown>, phase: SeasonPhase) {
+  const window = {
+    idea: [season.idea_phase_start, season.idea_phase_end],
+    build: [season.build_phase_start, season.build_phase_end],
+    submission: [season.submission_phase_start, season.submission_phase_end],
+    voting: [season.voting_phase_start, season.voting_phase_end],
+    judging: [season.judging_phase_start, season.judging_phase_end],
+  }[phase];
+  const [startsAt, endsAt] = window;
+  const now = Date.now();
+  if (typeof startsAt !== "string" || typeof endsAt !== "string" || now < Date.parse(startsAt) || now > Date.parse(endsAt)) {
+    throw new AppError("validation", `The ${phase} window is not open for this season.`, 409);
+  }
+}
+
+export async function requireSprintPass(userId: string, seasonId: string) {
+  const { data: season, error: seasonError } = await supabaseAdmin().from("seasons").select("year").eq("id", seasonId).maybeSingle();
+  if (seasonError) throw seasonError;
+  if (!season) throw new AppError("validation", "The selected season does not exist.", 404);
+  const { data, error } = await supabaseAdmin()
+    .from("entitlements")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("season_year", season.year)
+    .eq("status", "active")
+    .gt("ends_at", new Date().toISOString())
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new AppError("authorization", "Sprint Pass is required for this feature.", 403);
+  return season;
+}
+
 export function isAdminEmail(email: string | undefined) {
   const emails = config()
     .ADMIN_EMAILS.split(",")

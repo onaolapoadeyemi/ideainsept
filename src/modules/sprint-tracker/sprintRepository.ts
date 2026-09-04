@@ -101,3 +101,9 @@ export async function updateMilestone(sprintId: string, milestoneId: string, com
   if (error) throw error;
   return null;
 }
+
+export async function updateSprintVisibility(sprintId: string, visibility: Sprint["visibility"]) {
+  if (!supabase) throw new Error("Sprint storage is not configured.");
+  const { error } = await supabase.from("sprints").update({ visibility, updated_at: new Date().toISOString() }).eq("id", sprintId);
+  if (error) throw error;
+}

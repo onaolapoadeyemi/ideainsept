@@ -6,7 +6,7 @@ import { Season } from "../season/types";
 import { ShowcaseSubmission } from "./types";
 
 
-type ShowcaseRow = { id: string; owner_id: string; seasons?: { year: number } | null; profiles?: { display_name?: string; public_profile?: boolean } | Array<{ display_name?: string; public_profile?: boolean }> | null; votes?: { count?: number } | Array<{ count?: number }> | null; project_name: string; tagline: string; pitch: string; tech_stack?: string[]; live_url: string; repository_url?: string | null; demo_video_url?: string | null; thumbnail_url?: string | null; moderation_status: ShowcaseSubmission["moderationStatus"]; moderation_note?: string | null; featured?: boolean; official_rank?: number | null; submitted_at?: string | null; approved_at?: string | null };
+type ShowcaseRow = { id: string; owner_id: string; seasons?: { year: number } | null; profiles?: { display_name?: string; public_profile?: boolean } | Array<{ display_name?: string; public_profile?: boolean }> | null; votes?: { count?: number } | Array<{ count?: number }> | null; project_name: string; tagline: string; pitch: string; tech_stack?: string[]; live_url: string; repository_url?: string | null; demo_video_url?: string | null; thumbnail_url?: string | null; moderation_status: ShowcaseSubmission["moderationStatus"]; moderation_note?: string | null; featured?: boolean; official_rank?: number | null; priority_review?: boolean; submitted_at?: string | null; approved_at?: string | null };
 
 function mapSubmission(row: ShowcaseRow): ShowcaseSubmission {
   const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
@@ -17,7 +17,7 @@ function mapSubmission(row: ShowcaseRow): ShowcaseSubmission {
     liveUrl: row.live_url, repositoryUrl: row.repository_url || undefined, demoVideoUrl: row.demo_video_url || undefined,
     thumbnailUrl: row.thumbnail_url || undefined, moderationStatus: row.moderation_status, moderationNote: row.moderation_note || undefined,
     creatorDisplayName: profile?.display_name || "Builder", creatorPublic: Boolean(profile?.public_profile),
-    votes: Number(voteAggregate?.count || 0), featured: Boolean(row.featured), officialRank: row.official_rank || undefined,
+    votes: Number(voteAggregate?.count || 0), featured: Boolean(row.featured), officialRank: row.official_rank || undefined, priorityReview: Boolean(row.priority_review),
     submittedAt: row.submitted_at || undefined, approvedAt: row.approved_at || undefined,
   };
 }
@@ -26,7 +26,7 @@ const select = "*, seasons(year), profiles!showcase_submissions_owner_id_fkey(di
 
 export async function getSubmissions(includePending = false) {
   if (!supabase) return [];
-  let query = supabase.from("showcase_submissions").select(select).order("featured", { ascending: false }).order("approved_at", { ascending: false });
+  let query = supabase.from("showcase_submissions").select(select).order("featured", { ascending: false }).order("priority_review", { ascending: false }).order("approved_at", { ascending: false });
   if (!includePending) query = query.eq("moderation_status", "approved");
   const { data, error } = await query;
   if (error) throw error;

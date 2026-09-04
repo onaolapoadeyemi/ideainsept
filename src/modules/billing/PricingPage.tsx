@@ -45,7 +45,6 @@ export default function PricingPage() {
     void poll();
     return () => { cancelled = true; };
   }, [checkoutStatus, entitlement.plan, notify, refresh, user]);
-
   async function startCheckout() {
     analytics.track("checkout_started", { plan: "sprint_pass" });
     if (!clientConfig.paymentsEnabled) {
@@ -85,11 +84,11 @@ export default function PricingPage() {
         <p className="mt-3 text-muted">A one-time annual season pass. No automatic renewal is enabled in this MVP.</p>
         <ul className="mt-6 grid gap-3 text-sm">
           {[
-            "Expanded AI allowance within the platform-wide cost ceiling",
-            "Idea refinement and pivot suggestions",
-            "AI-generated 30-day execution plan",
-            "Private notes, exportable report, and unlisted sprint option",
-            "Priority showcase review, described as faster review only",
+            "Up to 50 live-AI generations when the free quota is available, with curated ideas always available",
+            "Guided idea refinement and pivot suggestions",
+            "A structured 30-day execution plan",
+            "Private sprint notes, exportable report, and unlisted sprint option",
+            "Priority showcase review (faster moderation only; never votes or ranking)",
           ].map((item) => (
             <li key={item} className="flex gap-2">
               <Check className="text-amber-300" size={18} aria-hidden="true" />

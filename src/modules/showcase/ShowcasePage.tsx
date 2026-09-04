@@ -6,6 +6,7 @@ import { ShowcaseSubmission } from "./types";
 import { useToast } from "../../shared/components/Toast";
 import { useSeason } from "../season/SeasonProvider";
 import { LoadingPanel } from "../../shared/components/LoadingPanel";
+import { calculateSeasonPhase } from "../season/seasonPhase";
 
 export default function ShowcasePage() {
   const [query, setQuery] = useState("");
@@ -15,6 +16,7 @@ export default function ShowcasePage() {
   const { user } = useAuth();
   const { notify } = useToast();
   const { season } = useSeason();
+  const phase = calculateSeasonPhase(season, new Date());
   const filtered = useMemo(
     () =>
       submissions.filter((submission) => {
@@ -31,6 +33,10 @@ export default function ShowcasePage() {
   }, [notify]);
 
   async function vote(id: string) {
+    if (phase !== "voting") {
+      notify("Community voting is not open for this season yet.", "info");
+      return;
+    }
     if (!user) {
       notify("Sign in before voting so one-person-one-vote can be enforced.", "warning");
       return;
@@ -106,7 +112,7 @@ export default function ShowcasePage() {
                       <ExternalLink size={16} aria-hidden="true" />
                     </a>
                   ) : null}
-                  <button className="button button-primary" onClick={() => void vote(submission.id)}>
+                  <button className="button button-primary" onClick={() => void vote(submission.id)} disabled={phase !== "voting"}>
                     <ThumbsUp size={17} aria-hidden="true" />
                     Vote
                   </button>
@@ -118,12 +124,12 @@ export default function ShowcasePage() {
           )}
         </div>
       </div>
-      <SubmissionForm />
+      <SubmissionForm phase={phase} />
     </section>
   );
 }
 
-function SubmissionForm() {
+function SubmissionForm({ phase }: { phase: ReturnType<typeof calculateSeasonPhase> }) {
   const { user } = useAuth();
   const { notify } = useToast();
   const { season } = useSeason();
@@ -143,6 +149,10 @@ function SubmissionForm() {
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (form.company) return;
+    if (phase !== "submission") {
+      notify("Project submissions are not open for this season yet.", "info");
+      return;
+    }
     if (!user) {
       notify("Sign in to submit a project.", "warning");
       return;
@@ -174,7 +184,7 @@ function SubmissionForm() {
   return (
     <form className="panel p-5" onSubmit={submit}>
       <h2 className="text-2xl font-black">Submit Finished Build</h2>
-      <p className="mt-2 text-sm text-muted">Submissions enter moderation first. Priority review means faster review, not guaranteed ranking.</p>
+      <p className="mt-2 text-sm text-muted">Submissions enter moderation first. Priority review means faster review, not guaranteed ranking. Current phase: {phase}.</p>
       <div className="mt-5 grid gap-4">
         <input className="hidden" tabIndex={-1} autoComplete="off" value={form.company} onChange={(event) => setForm({ ...form, company: event.target.value })} aria-hidden="true" />
         <Field label="Project name" value={form.projectName} onChange={(value) => setForm({ ...form, projectName: value })} required />
@@ -195,7 +205,7 @@ function SubmissionForm() {
           <input type="checkbox" checked={form.acceptsRules} onChange={(event) => setForm({ ...form, acceptsRules: event.target.checked })} />
           I agree to the showcase rules and community guidelines.
         </label>
-        <button className="button button-primary" type="submit">
+        <button className="button button-primary" type="submit" disabled={phase !== "submission"}>
           <Send size={18} aria-hidden="true" />
           Submit for Review
         </button>

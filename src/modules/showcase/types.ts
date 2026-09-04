@@ -19,6 +19,7 @@ export type ShowcaseSubmission = {
   votes: number;
   featured: boolean;
   officialRank?: number;
+  priorityReview?: boolean;
   submittedAt?: string;
   approvedAt?: string;
 };

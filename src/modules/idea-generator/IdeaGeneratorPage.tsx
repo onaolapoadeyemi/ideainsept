@@ -5,11 +5,12 @@ import { useAuth } from "../auth/AuthProvider";
 import { Paywall } from "../billing/Paywall";
 import { freeEntitlement } from "../billing/entitlements";
 import { GeneratedIdea, IdeaRequest } from "./types";
-import { generateIdeas, saveIdea } from "./ideaRepository";
+import { buildIdeaGuidance, generateIdeas, saveIdea } from "./ideaRepository";
 import { createSprintFromIdea } from "../sprint-tracker/sprintRepository";
 import { analytics } from "../../shared/services/analytics";
 import { useToast } from "../../shared/components/Toast";
 import { useSeason } from "../season/SeasonProvider";
+import { useEntitlement } from "../billing/EntitlementProvider";
 
 const initialRequest: IdeaRequest = {
   skills: "web design, marketing, React",
@@ -30,8 +31,10 @@ export default function IdeaGeneratorPage({ embedded = false }: { embedded?: boo
   const { user } = useAuth();
   const { season } = useSeason();
   const { notify } = useToast();
+  const { entitlement } = useEntitlement();
   const navigate = useNavigate();
   const selectedIdea = ideas.find((idea) => idea.id === selectedId) ?? ideas[0];
+  const [guidance, setGuidance] = useState<{ refine: string; pivot: string } | null>(null);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -40,6 +43,7 @@ export default function IdeaGeneratorPage({ embedded = false }: { embedded?: boo
       const generated = await generateIdeas({ ...request, guest: !user });
       setIdeas(generated);
       setSelectedId(generated[0]?.id ?? null);
+      setGuidance(null);
     } catch (error) {
       notify(error instanceof Error ? error.message : "Idea generation is temporarily unavailable.", "error");
     } finally {
@@ -178,7 +182,26 @@ export default function IdeaGeneratorPage({ embedded = false }: { embedded?: boo
                 <GitCompare size={18} aria-hidden="true" />
                 Compare
               </button>
+              <button
+                className="button button-secondary"
+                onClick={() => {
+                  if (entitlement.plan !== "sprint_pass") {
+                    notify("Sprint Pass unlocks guided refinement and pivots.", "warning");
+                    return;
+                  }
+                  setGuidance(buildIdeaGuidance(selectedIdea));
+                }}
+              >
+                <Sparkles size={18} aria-hidden="true" />
+                Refine & Pivot
+              </button>
             </div>
+            {guidance ? (
+              <div className="mt-5 grid gap-3 rounded-lg border border-amber-300/30 bg-amber-400/5 p-4 text-sm">
+                <p><span className="font-black text-amber-200">Refine:</span> {guidance.refine}</p>
+                <p><span className="font-black text-amber-200">Pivot:</span> {guidance.pivot}</p>
+              </div>
+            ) : null}
           </article>
         ) : (
           <article className="panel p-5">
@@ -196,7 +219,7 @@ export default function IdeaGeneratorPage({ embedded = false }: { embedded?: boo
             ))}
           </div>
         )}
-        <Paywall feature="Refine and plan with AI" benefit="Sprint Pass unlocks refinement, pivot suggestions, and an AI-generated 30-day execution plan before the $29 price appears." />
+        <Paywall feature="Refine and plan" benefit="Sprint Pass unlocks guided refinement, pivot suggestions, and a structured 30-day execution plan." />
         <p className="text-xs text-muted">Free live-AI allowance: {freeEntitlement.aiGenerationsPerSeason} requests within the configured quota window. Curated ideas remain available when the live limit is reached.</p>
         {!embedded && (
           <Link to="/showcase" className="button button-secondary justify-self-start">
